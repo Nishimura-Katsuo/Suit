@@ -36,12 +36,32 @@ function setCache(filename, cache) {
   return cache;
 }
 
+function invalidateCache(filename) {
+  filename = path.resolve(filename);
+  if (fileDeps[filename] && fileDeps[filename].type && fileDeps[filename].cache) {
+    if (fileDeps[filename].type === 'require') {
+      let rn = require.resolve(filename);
+      if (require.cache[rn]) {
+        delete require.cache[rn];
+      }      
+    }
+
+    fileDeps[filename].cache = null;
+
+    if (fileDeps[filename].dependants) {
+      Object.keys(fileDeps[filename].dependants).forEach(dependant => {
+        invalidateCache(dependant);
+      });
+    }
+  }
+}
+
 Module.prototype.require = function(...args) {
   let prev = getStack()[0].getFileName();
   depType(prev, 'require');
   depType(args[0], 'require');
   addDep(prev, args[0]);
-  return originalRequire.apply(this, args);
+  return setCache(args[0], originalRequire.apply(this, args));
 };
 
 const fs = require('fs');
@@ -180,7 +200,7 @@ class PageTemplate {
                 global: globalContext,
               }, ...args, ...part.args);
             } else {
-              output += '<details><summary>Error</summary><p style="position: absolute !important">Function "' + part.function + '" not found in: ' + part.src + '<p></details>';
+              output += '<details><summary>Error</summary><p style="position: absolute !important">Function "' + part.function + '" not found or callable in: ' + part.src + '<p></details>';
             }
           }
         } catch (err) {
@@ -199,7 +219,7 @@ async function renderPage(filename, ...args) {
   filename = path.resolve(filename);
 
   if (!fileDeps[filename] || !fileDeps[filename].cache) {
-    template = await PageTemplate.compileTemplate('content/index.node.html');
+    template = await PageTemplate.compileTemplate(filename);
   } else {
     template = fileDeps[filename].cache;
   }
@@ -208,25 +228,16 @@ async function renderPage(filename, ...args) {
 }
 
 (async function () {
-  let start, celapsed, relapsed;
-  start = performance.now();
-  await PageTemplate.compileTemplate('content/index.node.html');
-  celapsed = performance.now() - start;
-  console.log('Compile Elapsed:', celapsed);
+  let start, relapsed;
   console.log('deps', fileDeps);
-  let total = 0, count = 0;
 
-  for (let c = 0; c < 50; c++) {
-    start = performance.now();
-    let output = await renderPage('content/index.node.html', Math.random());
-    relapsed = performance.now() - start;
-    total += relapsed;
-    count++;
-    console.log('='.repeat(40));
-    console.log(output);
-    console.log('Render Elapsed:', relapsed);  
+  start = performance.now();
+  for (let c = 0; c < 2000; c++) {
+    invalidateCache('content/index.node.html');
+    await renderPage('content/index.node.html', Math.random());
   }
+  relapsed = performance.now() - start;
 
   console.log('='.repeat(40));
-  console.log('Average Render Time:', total / count);
+  console.log('Average Render Time:', relapsed / 2000);
 })();
