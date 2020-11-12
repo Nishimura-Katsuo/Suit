@@ -1,0 +1,19 @@
+{
+  "name": "suit",
+  "version": "1.0.0",
+  "description": "Suit - A CMS that will dress up your content with style!",
+  "main": "main.js",
+  "scripts": {
+    "start": "node main.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Nishimura-Katsuo/Suit.git"
+  },
+  "author": "Nishimura-Katsuo",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/Nishimura-Katsuo/Suit/issues"
+  },
+  "homepage": "https://github.com/Nishimura-Katsuo/Suit#readme"
+}

@@ -1,0 +1,17 @@
+[Unit]
+Description=Suit CMS Server
+After=network.target
+
+[Service]
+User=www-data
+Group=www-data
+ExecStart=/usr/bin/node /var/www/suit/server.js
+WorkingDirectory=/var/www/suit/
+Restart=always
+RestartSec=10
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=suit
+
+[Install]
+WantedBy=multi-user.target
