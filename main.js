@@ -76,20 +76,27 @@ async function compileTemplate(filename, files = {}) {
                 switch (tag) {
                 case 'include':
                 case 'fragment':
-                  {
+                  try {
                     let newparts = await compileTemplate(current.src, files);
                     parts.splice(c, 1, ...newparts);
                     c += newparts.length - 1;
+                  } catch (err) {
+                    parts[c] = 'Error loading template: ' + current.src;
                   }
       
                   break;
                 case 'node':
                   {
                     let args = current.src.split('#');
-                    current.module = require(args[0]);
-                    current.function = args[1];
-                    current.args = args.slice(2);
-                    files[args[0]] = true;
+                    try {
+                      current.src = args[0];
+                      current.module = require(args[0]);
+                      current.function = args[1];
+                      current.args = args.slice(2);
+                      files[args[0]] = true;
+                    } catch (err) {
+                      parts[c] = 'Error loading module: ' + args[0];
+                    }
                   }
                   break;
                 }
@@ -118,7 +125,7 @@ async function renderTemplate (renderParts, ...args) {
           if (typeof part.module[part.function] === 'function') {
             output += await part.module[part.function](...args, ...part.args);
           } else {
-            output += '<details><summary>Error</summary><p style="position: absolute !important">Function "' + func + '" not found in: ' + parts.src + '<p></details>';
+            output += '<details><summary>Error</summary><p style="position: absolute !important">Function "' + part.function + '" not found in: ' + part.src + '<p></details>';
           }
         }
       } catch (err) {
@@ -133,7 +140,7 @@ async function renderTemplate (renderParts, ...args) {
 (async function () {
   let start, celapsed, relapsed;
   start = performance.now();
-  let files = {}, parts = await compileTemplate('index.node.html', files);
+  let files = {}, parts = await compileTemplate('content/index.node.html', files);
   celapsed = performance.now() - start;
   start = performance.now();
   let output = await renderTemplate(parts);
