@@ -5,8 +5,8 @@ After=network.target
 [Service]
 User=www-data
 Group=www-data
-ExecStart=/usr/bin/node /var/www/suit/server.js
-WorkingDirectory=/var/www/suit/
+ExecStart=/usr/bin/node /home/jwebbb01_gmail_com/Suit/main.js
+WorkingDirectory=/home/jwebbb01_gmail_com/Suit/
 Restart=always
 RestartSec=10
 StandardOutput=syslog
