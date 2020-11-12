@@ -1,8 +1,23 @@
-/* global Promise Symbol __filename */
+/* global Promise Symbol __filename process */
 const Module = require('module');
+const fs = require('fs');
+const path = require('path');
+
 const originalRequire = Module.prototype.require;
 
 let fileDeps = {};
+
+function resolveName(filename, type) {
+  if (type === 'require') {
+    if (!Object.keys(process.binding('natives')).includes(filename)) {
+      filename = require.resolve(filename);
+    }
+  } else {
+    filename = path.resolve(filename);
+  }
+
+  return filename;
+}
 
 function getStack() {
   let origPrepareStackTrace = Error.prepareStackTrace;
@@ -15,14 +30,26 @@ function getStack() {
   return stack;
 }
 
+Module.prototype.require = function(...args) {
+  let prev = getStack()[0].getFileName();
+  depType(prev, 'require');
+  depType(args[0], 'require');
+  addDep(prev, 'require', args[0], 'require');
+  return setCache(args[0], originalRequire.apply(this, args));
+};
+
 function depType(name, type) {
+  name = resolveName(name, type);
   if (name !== __filename) {
     fileDeps[name] = fileDeps[name] || {};
     fileDeps[name].type = type;
   }
 }
 
-function addDep(src, filename) {
+function addDep(src, srcType, filename, filenameType) {
+  src = resolveName(src, srcType);
+  filename = resolveName(filename, filenameType);
+
   if (src !== __filename && filename !== __filename) {
     fileDeps[filename] = fileDeps[filename] || {};
     fileDeps[filename].dependants = fileDeps[filename].dependants || {};
@@ -30,42 +57,47 @@ function addDep(src, filename) {
   }
 }
 
-function setCache(filename, cache) {
-  fileDeps[filename] = fileDeps[filename] || {};
-  fileDeps[filename].cache = cache;
-  return cache;
-}
-
 function invalidateCache(filename) {
-  filename = path.resolve(filename);
-  if (fileDeps[filename] && fileDeps[filename].type && fileDeps[filename].cache) {
+  if (fileDeps[filename] && fileDeps[filename].cache) {
+    if (fileDeps[filename].type) {
+      filename = resolveName(filename, fileDeps[filename].type);
+    }
+
     if (fileDeps[filename].type === 'require') {
-      let rn = require.resolve(filename);
-      if (require.cache[rn]) {
-        delete require.cache[rn];
+      if (require.cache[filename]) {
+        delete require.cache[filename];
       }      
     }
 
     fileDeps[filename].cache = null;
+    console.log('Invalidated:', filename);
 
     if (fileDeps[filename].dependants) {
       Object.keys(fileDeps[filename].dependants).forEach(dependant => {
-        invalidateCache(dependant);
+        if (fileDeps[filename].dependants[dependant]) {
+          invalidateCache(dependant);
+        }
       });
     }
   }
 }
 
-Module.prototype.require = function(...args) {
-  let prev = getStack()[0].getFileName();
-  depType(prev, 'require');
-  depType(args[0], 'require');
-  addDep(prev, args[0]);
-  return setCache(args[0], originalRequire.apply(this, args));
-};
+function setCache(filename, cache) {
+  if (fileDeps[filename] && fileDeps[filename].type) {
+    filename = resolveName(filename, fileDeps[filename].type);
+    fileDeps[filename] = fileDeps[filename] || {};
+    fileDeps[filename].cache = cache;
+    if (!fileDeps[filename].watcher && fs.existsSync(filename)) {
+      fileDeps[filename].watcher = fs.watch(filename, {
+        persistent: true,
+      }, () => {
+        invalidateCache(filename);
+      });
+    }  
+  }
+  return cache;
+}
 
-const fs = require('fs');
-const path = require('path');
 const { performance } = require('perf_hooks');
 
 let splitRegex = /(<(?:include|fragment|node)(?:\s*(?:"[^"]*"|'[^']*'|=|[^>=]*))*>?)/;
@@ -80,7 +112,7 @@ class PageTemplate {
 
   static compileTemplate (filename) {
     return new Promise((resolve, reject) => {
-      filename = path.resolve(filename);
+      filename = resolveName(filename, 'template');
 
       fs.readFile(filename, async (err, data) => {
         depType(filename, 'template');
@@ -149,7 +181,7 @@ class PageTemplate {
                   case 'fragment':
                     try {
                       let newparts = (await this.compileTemplate(current.src))[partSymbol];
-                      addDep(filename, current.src);
+                      addDep(filename, 'template', current.src, 'template');
                       parts.splice(c, 1, ...newparts);
                       c += newparts.length - 1;
                     } catch (err) {
@@ -163,7 +195,7 @@ class PageTemplate {
                       try {
                         current.src = args[0];
                         current.module = require(args[0]);
-                        addDep(filename, args[0]);
+                        addDep(filename, 'template', args[0], 'require');
                         current.function = args[1];
                         current.args = args.slice(2);
                       } catch (err) {
@@ -213,10 +245,10 @@ class PageTemplate {
   }  
 }
 
-async function renderPage(filename, ...args) {
+async function renderTemplate(filename, ...args) {
   let template;
 
-  filename = path.resolve(filename);
+  filename = resolveName(filename, 'template');
 
   if (!fileDeps[filename] || !fileDeps[filename].cache) {
     template = await PageTemplate.compileTemplate(filename);
@@ -226,18 +258,3 @@ async function renderPage(filename, ...args) {
 
   return template.renderTemplate(...args);
 }
-
-(async function () {
-  let start, relapsed;
-  console.log('deps', fileDeps);
-
-  start = performance.now();
-  for (let c = 0; c < 2000; c++) {
-    invalidateCache('content/index.node.html');
-    await renderPage('content/index.node.html', Math.random());
-  }
-  relapsed = performance.now() - start;
-
-  console.log('='.repeat(40));
-  console.log('Average Render Time:', relapsed / 2000);
-})();
