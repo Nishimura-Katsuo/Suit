@@ -84,6 +84,8 @@ function setCache(filename, type, cache) {
       persistent: true,
     }, () => {
       invalidateCache(filename);
+      fileDeps[filename].watcher.close();
+      fileDeps[filename].watcher = null;
     });
   }  
   return cache;

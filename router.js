@@ -7,12 +7,9 @@ module.exports.route = async function (req, res) {
   switch(q.pathname) {
   case '/index':
   case '/index.html':
-    output = await renderTemplate('content/index.html', {q, req, res});
     res.writeHead(301, {
-      'Content-Type': 'text/html',
       'Location': '/',
     });
-    res.write(output);
     res.end();
     return;
   case '/':
@@ -22,13 +19,13 @@ module.exports.route = async function (req, res) {
     res.end();
     return;
   case '/api':
-    output = await require('./api.js').request({q, req, res});
+    output = await require('./content/api.js').request({q, req, res});
     res.write(output);
     res.end();
     return;
   }
 
-  output = await renderTemplate('content/error.html', {res, req}, 404, new Error('Route Not Found:' + req.url));
+  output = await renderTemplate('error/404.html', {q, res, req});
   res.writeHead(404, { 'Content-Type': 'text/html' });
   res.write(output);
   res.end();
