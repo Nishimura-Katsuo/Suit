@@ -65,7 +65,6 @@ function invalidateCache(filename) {
     }
 
     fileDeps[filename].cache = null;
-    console.log('Invalidated:', filename);
     if (fileDeps[filename].dependants) {
       Object.keys(fileDeps[filename].dependants).forEach(dependant => {
         if (fileDeps[filename].dependants[dependant]) {
