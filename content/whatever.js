@@ -1,7 +1,9 @@
-module.exports.title = function (context) {
-  return 'arg: ' + context;
+const fs = require('fs');
+
+module.exports.title = function ({context}, contextid) {
+  return 'arg: ' + contextid;
 };
 
-module.exports.body = function (context) {
-  return 'arg: ' + context;
+module.exports.body = function ({context}, contextid) {
+  return 'arg: ' + contextid;
 };
