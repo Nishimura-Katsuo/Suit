@@ -24,12 +24,16 @@ function depType(name, type) {
 
 function addDep(src, filename) {
   if (src !== __filename && filename !== __filename) {
-    //fileDeps[src].deps = fileDeps[src].deps || {};
-    //fileDeps[src].deps[filename] = true;
-
+    fileDeps[filename] = fileDeps[filename] || {};
     fileDeps[filename].dependants = fileDeps[filename].dependants || {};
     fileDeps[filename].dependants[src] = true;
   }
+}
+
+function setCache(filename, cache) {
+  fileDeps[filename] = fileDeps[filename] || {};
+  fileDeps[filename].cache = cache;
+  return cache;
 }
 
 Module.prototype.require = function(...args) {
@@ -153,7 +157,7 @@ class PageTemplate {
             }
           }
         
-          resolve(new this(parts));
+          resolve(setCache(filename, new this(parts)));
         } else {
           reject(err);
         }
@@ -189,17 +193,40 @@ class PageTemplate {
   }  
 }
 
+async function renderPage(filename, ...args) {
+  let template;
+
+  filename = path.resolve(filename);
+
+  if (!fileDeps[filename] || !fileDeps[filename].cache) {
+    template = await PageTemplate.compileTemplate('content/index.node.html');
+  } else {
+    template = fileDeps[filename].cache;
+  }
+
+  return template.renderTemplate(...args);
+}
+
 (async function () {
   let start, celapsed, relapsed;
   start = performance.now();
-  let page = await PageTemplate.compileTemplate('content/index.node.html');
+  await PageTemplate.compileTemplate('content/index.node.html');
   celapsed = performance.now() - start;
-  start = performance.now();
-  let output = await page.renderTemplate();
-  relapsed = performance.now() - start;
-  console.log(output);
-  console.log(__filename);
-  console.log('deps', fileDeps);
   console.log('Compile Elapsed:', celapsed);
-  console.log('Render Elapsed:', relapsed);
+  console.log('deps', fileDeps);
+  let total = 0, count = 0;
+
+  for (let c = 0; c < 50; c++) {
+    start = performance.now();
+    let output = await renderPage('content/index.node.html', Math.random());
+    relapsed = performance.now() - start;
+    total += relapsed;
+    count++;
+    console.log('='.repeat(40));
+    console.log(output);
+    console.log('Render Elapsed:', relapsed);  
+  }
+
+  console.log('='.repeat(40));
+  console.log('Average Render Time:', total / count);
 })();

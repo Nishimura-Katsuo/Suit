@@ -1,9 +1,9 @@
 const fs = require('fs');
 
-module.exports.title = function ({context}, contextid) {
-  return 'arg: ' + contextid;
+module.exports.title = function ({context}, rando, contextid) {
+  return 'arg: ' + rando;
 };
 
-module.exports.body = function ({context}, contextid) {
-  return 'arg: ' + contextid;
+module.exports.body = function ({context}, rando, contextid) {
+  return 'arg: ' + rando;
 };
