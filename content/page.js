@@ -15,7 +15,7 @@ module.exports = {
       session.loggedIn = false;
     }
 
-    return renderTemplate(session.loggedIn ? 'content/loggedin.fragment.html' : 'content/loggedout.fragment.html');  
+    return renderTemplate(session.loggedIn ? 'content/loggedin.fragment.html' : 'content/loggedout.fragment.html');
   },
 
   getUserName ({ session }) {
