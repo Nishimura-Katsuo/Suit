@@ -1,19 +1,19 @@
 module.exports.request = function ({ res }) {
-  res.writeHead(200, { 'Content-Type': 'text/json' });
+	res.writeHead(200, { 'Content-Type': 'text/json' });
 
-  return JSON.stringify({
-    a: true,
-    b: false,
-    c: {
-      wtf: 'poot',
-    },
-  });
+	return JSON.stringify({
+		a: true,
+		b: false,
+		c: {
+			wtf: 'poot',
+		},
+	});
 };
 
 module.exports.connect = function ({ ws }) {
-  ws.on('message', data => {
-    throw new Error(data);
-    console.log(data);
-  });
-  return true; // Accept the connection.
+	ws.on('message', data => {
+		console.log(data);
+	});
+
+	return true; // Accept the connection.
 };

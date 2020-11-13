@@ -18,6 +18,7 @@
   "homepage": "https://github.com/Nishimura-Katsuo/Suit#readme",
   "dependencies": {
     "bufferutil": "^4.0.2",
+    "client-sessions": "^0.8.0",
     "utf-8-validate": "^5.0.3",
     "ws": "^7.4.0"
   }
