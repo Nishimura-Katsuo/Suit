@@ -18,7 +18,7 @@ module.exports = {
 	},
 	"rules": {
 		// enable additional rules
-		"indent": ["warn", "tab"],
+		"indent": ["warn", 2],
 		"linebreak-style": ["warn", "unix"],
 		"semi": ["error", "always"],
 		"comma-spacing": ["error", {"before": false, "after": true}],
