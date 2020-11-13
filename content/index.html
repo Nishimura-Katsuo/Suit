@@ -1,8 +1,12 @@
-<html>
+<html class="bg-secondary">
     <head>
         <title>Front Page</title>
+        <include src="header.fragment.html"/>
     </head>
-    <body>
-        <p>Hey, you're logged in as <em><node src="./page.js#getUserName"/></em> and junk.</p>
+    <body class="my-3 container card">
+        <div class="card-body">
+            <h1>Front Page</h1>
+            <p>Hey, you're logged in as <em><node src="./page.js#getUserName"/></em> and junk.</p>    
+        </div>
     </body>
 </html>
