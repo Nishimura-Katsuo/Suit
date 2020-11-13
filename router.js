@@ -1,7 +1,7 @@
 const url = require('url');
 const { renderTemplate } = require('./templateEngine');
 
-module.exports.route = async function (req, res) {
+module.exports.route = async function ({req, res}) {
   let q = url.parse(req.url, true), output;
 
   switch(q.pathname) {
@@ -25,8 +25,19 @@ module.exports.route = async function (req, res) {
     return;
   }
 
-  output = await renderTemplate('error/404.html', {q, res, req});
+  output = await renderTemplate('error/404.html', {q, req, res});
   res.writeHead(404, { 'Content-Type': 'text/html' });
   res.write(output);
   res.end();
+};
+
+module.exports.connect = async function ({req, ws, wss}) {
+  let q = url.parse(req.url, true);
+
+  switch (q.pathname) {
+  case '/api':
+    return require('./content/api.js').connect({req, ws, wss});
+  }
+
+  return false;
 };

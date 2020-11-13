@@ -7,18 +7,6 @@ const originalRequire = Module.prototype.require;
 
 let fileDeps = {};
 
-function resolveName(filename, type) {
-  if (type === 'require') {
-    if (!Object.keys(process.binding('natives')).includes(filename)) {
-      filename = require.resolve(filename);
-    }
-  } else {
-    filename = path.resolve(filename);
-  }
-
-  return filename;
-}
-
 function getStack() {
   let origPrepareStackTrace = Error.prepareStackTrace;
   Error.prepareStackTrace = (_, stack) => stack;
@@ -30,32 +18,48 @@ function getStack() {
   return stack;
 }
 
+function resolveName(filename, type, parent) {
+  if (type === 'require') {
+    if (!Object.keys(process.binding('natives')).includes(filename)) {
+      if (parent) {
+        filename = Module._resolveFilename(filename, parent, false);
+      } else {
+        filename = path.resolve(filename);
+      }
+    }
+  } else {
+    filename = path.resolve(filename);
+  }
+
+  return filename;
+}
+
 Module.prototype.require = function(...args) {
   let prev = getStack()[0].getFileName();
-  depType(prev, 'require');
-  depType(args[0], 'require');
-  addDep(prev, 'require', args[0], 'require');
+  depType(prev, 'require', this);
+  depType(args[0], 'require', this);
+  addDep(prev, 'require', args[0], 'require', this);
   return setCache(args[0], 'require', originalRequire.apply(this, args));
 };
 
-function depType(name, type) {
-  name = resolveName(name, type);
+function depType(name, type, parent) {
+  name = resolveName(name, type, parent);
   fileDeps[name] = fileDeps[name] || {};
   fileDeps[name].type = type;
 }
 
-function addDep(src, srcType, filename, filenameType) {
-  src = resolveName(src, srcType);
-  filename = resolveName(filename, filenameType);
+function addDep(src, srcType, filename, filenameType, parent) {
+  src = resolveName(src, srcType, parent);
+  filename = resolveName(filename, filenameType, parent);
   fileDeps[filename] = fileDeps[filename] || {};
   fileDeps[filename].dependants = fileDeps[filename].dependants || {};
   fileDeps[filename].dependants[src] = true;
 }
 
-function invalidateCache(filename) {
+function invalidateCache(filename, parent) {
   if (fileDeps[filename] && fileDeps[filename].cache) {
     if (fileDeps[filename].type) {
-      filename = resolveName(filename, fileDeps[filename].type);
+      filename = resolveName(filename, fileDeps[filename].type, parent);
     }
 
     if (fileDeps[filename].type === 'require') {
@@ -75,8 +79,8 @@ function invalidateCache(filename) {
   }
 }
 
-function setCache(filename, type, cache) {
-  filename = resolveName(filename, type);
+function setCache(filename, type, cache, parent) {
+  filename = resolveName(filename, type, parent);
   fileDeps[filename] = fileDeps[filename] || {};
   fileDeps[filename].cache = cache;
   if (!fileDeps[filename].watcher && fs.existsSync(filename)) {

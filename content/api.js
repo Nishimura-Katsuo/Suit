@@ -9,3 +9,11 @@ module.exports.request = function ({ res }) {
     },
   });
 };
+
+module.exports.connect = function ({ ws }) {
+  ws.on('message', data => {
+    throw new Error(data);
+    console.log(data);
+  });
+  return true; // Accept the connection.
+};
