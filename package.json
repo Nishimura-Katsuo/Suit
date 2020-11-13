@@ -15,5 +15,8 @@
   "bugs": {
     "url": "https://github.com/Nishimura-Katsuo/Suit/issues"
   },
-  "homepage": "https://github.com/Nishimura-Katsuo/Suit#readme"
+  "homepage": "https://github.com/Nishimura-Katsuo/Suit#readme",
+  "dependencies": {
+    "ws": "^7.4.0"
+  }
 }
