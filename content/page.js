@@ -1,24 +1,27 @@
 const utilities = require('../utilities.js');
 
 module.exports = {
-  title () {
-    return 'Title';
-  },
-
-  async body ({ req, session }) {
+  async login (...args) {
+    let { req, res, session } = args[0];
     let data = await utilities.getPostData(req);
 
     // Example login
-    if (data && data.username === 'test' && data.password === 'test') {
-      session.loggedIn = data.username;
-    } else {
-      session.loggedIn = false;
+    if (data && data.action === 'login') {
+      if (data.username === 'test' && data.password === 'test') {
+        session.loggedIn = data.username;
+      } else {
+        session.loggedIn = false;
+      }
+
+      res.writeHead(307, { Location: '/' });
+
+      return;
     }
 
-    return renderTemplate(session.loggedIn ? 'content/loggedin.fragment.html' : 'content/loggedout.fragment.html');
+    return renderTemplate('content/login.html', ...args);
   },
 
   getUserName ({ session }) {
-    return session.loggedIn;
+    return session.loggedIn || '(not logged in)';
   }
 };

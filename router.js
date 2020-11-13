@@ -19,13 +19,19 @@ module.exports.route = async function (...args) {
   case '/':
     output = await renderTemplate('content/index.html', ...args);
     res.writeHead(200, { 'Content-Type': 'text/html' });
-    res.write(output);
+    res.write(output && output.toString ? output.toString() : '');
+    res.end();
+
+    return;
+  case '/login':
+    output = await require('./content/page.js').login(...args);
+    res.write(output && output.toString ? output.toString() : '');
     res.end();
 
     return;
   case '/api':
     output = await require('./content/api.js').request(...args);
-    res.write(output);
+    res.write(output && output.toString ? output.toString() : '');
     res.end();
 
     return;
@@ -35,7 +41,7 @@ module.exports.route = async function (...args) {
 
   output = await renderTemplate('error/404.html', ...args);
   res.writeHead(404, { 'Content-Type': 'text/html' });
-  res.write(output);
+  res.write(output && output.toString ? output.toString() : '');
   res.end();
 };
 
