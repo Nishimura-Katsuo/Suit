@@ -1,11 +1,11 @@
 const url = require('url');
+const { performance } = require('perf_hooks');
 
 module.exports.route = async function (...args) {
-  let req = args[0].req, res = args[0].res;
-  let q = url.parse(req.url, true), output;
+  const renderTemplate = require('./templateEngine.js').renderTemplate;
+  let { req, res } = args[0], q = url.parse(req.url, true), output, start, elapsed;
 
-  args[0].q = q;
-  args[0].session = req.session;
+  args[0] = {...args[0], q, session: req.session};
 
   switch (q.pathname) {
   case '/index':
@@ -17,8 +17,13 @@ module.exports.route = async function (...args) {
 
     return;
   case '/':
+    start = performance.now();
     output = await renderTemplate('content/index.html', ...args);
-    res.writeHead(200, { 'Content-Type': 'text/html' });
+    elapsed = performance.now() - start;
+    res.writeHead(200, {
+      'Content-Type': 'text/html',
+      'X-Render-Time': elapsed,
+    });
     res.write(output && output.toString ? output.toString() : '');
     res.end();
 
@@ -48,7 +53,7 @@ module.exports.route = async function (...args) {
 module.exports.connect = async function (...args) {
   let req = args[0].req;
   let q = url.parse(req.url, true);
-  args[0].q = q;
+  args[0] = {...args[0], q};
 
   switch (q.pathname) {
   case '/api':

@@ -1,11 +1,12 @@
-global.renderTemplate = require('./templateEngine.js').renderTemplate;
+const { excludedFiles } = require('./cacheEngine.js');
 const http = require('http');
 const WebSocket = require('ws');
 const cluster = require('cluster');
 const sessions = require('client-sessions');
-const settings = require('./settings.js');
 
-let requestSessionHandler = sessions(settings.session);
+excludedFiles[__filename] = true;
+
+let requestSessionHandler = sessions(require('./settings.js').session);
 
 if (cluster.isMaster) {
   cluster.fork();

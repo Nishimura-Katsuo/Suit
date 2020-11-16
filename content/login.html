@@ -1,23 +1,17 @@
-<html class="bg-secondary">
-    <head>
-        <title>Login</title>
-        <include src="header.fragment.html"/>
-    </head>
-    <body class="my-3 container card">
-        <form method="post" class="card-body">
-            <h1>Login</h1>
-            <input type="hidden" name="action" value="login">
-            <p>
-                <label>Username</label>
-                <input type="text" name="username" size="8" autocomplete="username">
-            </p>
-            <p>
-                <label>Password</label>
-                <input type="password" name="password" size="8" autocomplete="current-password">
-            </p>
-            <p>
-                <input type="submit">
-            </p>
-        </form>
-    </body>
-</html>
+<include src="template.html">
+    <form method="post" class="card-body">
+        <h1>Login</h1>
+        <input type="hidden" name="action" value="login" />
+        <p>
+            <label>Username</label>
+            <input type="text" name="username" size=8 autocomplete="username" />
+        </p>
+        <p>
+            <label>Password</label>
+            <input type="password" name="password" size="8" autocomplete="current-password" />
+        </p>
+        <p>
+            <input type="submit" />
+        </p>
+    </form>
+</include>

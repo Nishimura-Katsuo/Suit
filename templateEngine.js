@@ -1,175 +1,67 @@
 const fs = require('fs');
 const path = require('path');
-const { fileDeps, resolveName, depType, addDep, setCache } = require('./cacheEngine.js');
-let splitRegex = /(<(?:include|fragment|node)(?:\s*(?:"[^"]*"|'[^']*'|=|[^>=]*))*>?)/;
-let tokenize = /"[^"]*"|=|[^="\s]+/g;
+const { fileDeps, depType, setCache } = require('./cacheEngine.js');
 
-let partSymbol = Symbol();
+function renderTemplate (filename, context = {}, ...args) {
+  return new Promise((resolve, reject) => {
+    filename = path.resolve(filename);
 
-class PageTemplate {
-  constructor (parts) {
-    this[partSymbol] = parts;
-  }
+    depType(filename, 'template');
 
-  static compileTemplate (filename) {
-    return new Promise((resolve, reject) => {
-      filename = resolveName(filename, 'template');
+    context = {...context, src: filename};
 
-      fs.readFile(filename, async (err, data) => {
-        depType(filename, 'template');
+    async function process (node) {
+      if (node.attributes.src && ['include', 'fragment'].includes(node.tag)) {
+        let nodefilename = path.resolve(path.dirname(filename), node.attributes.src);
 
-        if (!err) {
-          let parts = data.toString().split(splitRegex);
+        return await renderTemplate(nodefilename, {...context, node, parent: context}, ...args);
+      }
 
-          for (let c = 0; c < parts.length; c++) {
-            let tag, taglen;
+      if (node.attributes.src && node.tag === 'node') {
+        let parts = node.attributes.src.split('#');
 
-            if (typeof parts[c] === 'string') {
-              if (parts[c].slice(0, taglen = 9) === '<include ') {
-                tag = parts[c].slice(1, taglen - 1).toLowerCase();
-                parts[c] = parts[c].slice(taglen).trim();
-              }
-
-              if (parts[c].slice(0, taglen = 10) === '<fragment ') {
-                tag = parts[c].slice(1, taglen - 1).toLowerCase();
-                parts[c] = parts[c].slice(taglen).trim();
-              }
-
-              if (parts[c].slice(0, taglen = 6) === '<node ') {
-                tag = parts[c].slice(1, taglen - 1).toLowerCase();
-                parts[c] = parts[c].slice(taglen).trim();
-              }
-
-              if (tag) {
-                if (parts[c][parts[c].length - 1] === '>') {
-                  parts[c] = parts[c].slice(0, -1).trim();
-                }
-
-                if (parts[c][parts[c].length - 1] === '/') {
-                  parts[c] = parts[c].slice(0, -1).trim();
-                }
-
-                let tokens = parts[c].match(tokenize).map(v => {
-                  let start = 0, end = v.length;
-
-                  if (v[start] === '"') {
-                    start++;
-                  }
-
-                  if (v[end - 1] === '"') {
-                    end--;
-                  }
-
-                  return v.slice(start, end);
-                });
-
-                let current = parts[c] = {
-                  tag,
-                };
-
-                for (let d = 0; d < tokens.length; d++) {
-                  if (tokens[d + 1] === '=' && tokens[d + 2]) {
-                    current[tokens[d]] = tokens[d + 2];
-                    d += 2;
-                  }
-                }
-
-                if (current.src) {
-                  current.src = path.resolve(path.dirname(filename), current.src);
-                }
-
-                if (!current.tag || !current.src) {
-                  parts.splice(c, 1);
-                  c--;
-                } else {
-                  switch (tag) {
-                  case 'include':
-                  case 'fragment':
-                    try {
-                      let newparts = (await this.compileTemplate(current.src))[partSymbol];
-                      addDep(filename, 'template', current.src, 'template');
-                      parts.splice(c, 1, ...newparts);
-                      c += newparts.length - 1;
-                    } catch (e) {
-                      parts[c] = 'Error loading template: ' + current.src + ' (' + e + ')';
-                    }
-
-                    break;
-                  case 'node':
-                    {
-                      let args = current.src.split('#');
-
-                      try {
-                        current.src = args[0];
-                        current.parent = filename;
-                        current.module = require(args[0]);
-                        addDep(filename, 'template', args[0], 'require');
-                        current.function = args[1];
-                        current.args = args.slice(2);
-                      } catch (e) {
-                        parts[c] = 'Error loading module: ' + args[0] + ' (' + e + ')';
-                      }
-                    }
-
-                    break;
-                  default:
-                    break;
-                  }
-                }
-              }
-            }
-          }
-
-          resolve(setCache(filename, 'template', new this(parts)));
-        } else {
-          reject(err);
+        if (parts.length < 1) {
+          return '(no file specified)';
         }
-      });
-    });
-  }
 
-  async renderTemplate (...args) {
-    let output = '', contexts = {}, globalContext = {};
+        if (parts.length < 2) {
+          return '(no function specified)';
+        }
 
-    for (let part of this[partSymbol]) {
-      if (typeof part === 'string') {
-        output += part;
-      } else {
         try {
-          if (part.module && part.function) {
-            if (typeof part.module[part.function] === 'function') {
-              output += await part.module[part.function](...args, {
-                context: contexts[part.src] = contexts[part.src] || {},
-                global: globalContext,
-                args: part.args,
-                parent: part.parent,
-              });
-            } else {
-              output += '<details><summary>Error</summary><p>Function "' + part.function + '" not found or callable in: ' + part.src + '<p></details>';
-            }
+          let mod = require(path.resolve(path.dirname(filename), parts[0]));
+
+          if (!mod) {
+            return '(module "' + parts[0] + '" not found)';
           }
+
+          if (!mod[parts[1]]) {
+            return '(function "' + parts[1] + '" in module "' + parts[0] + '" not found)';
+          }
+
+          return await mod[parts[1]]({...context, node, parent: context}, ...args);
         } catch (err) {
-          output += '<details><summary>Error</summary><pre>' + err.stack + '</pre></details>';
+          return err && err.stack ? err.stack : err;
         }
       }
+
+      return context && context.node.contents || '';
     }
 
-    return output;
-  }
-}
-
-async function renderTemplate (filename, ...args) {
-  let template;
-
-  filename = resolveName(filename, 'template');
-
-  if (!fileDeps[filename] || !fileDeps[filename].cache) {
-    template = await PageTemplate.compileTemplate(filename);
-  } else {
-    template = fileDeps[filename].cache;
-  }
-
-  return template.renderTemplate(...args);
+    if (!fileDeps[filename] || !fileDeps[filename].cache) {
+      fs.readFile(filename, (err, data) => {
+        if (err) {
+          reject(err);
+        } else {
+          const { PageTemplate } = require('./xmlParser.js');
+          let template = setCache(filename, new PageTemplate(data.toString()));
+          template.build(process).then(output => resolve(output));
+        }
+      });
+    } else {
+      fileDeps[filename].cache.build(process).then(output => resolve(output));
+    }
+  });
 }
 
 module.exports.renderTemplate = renderTemplate;

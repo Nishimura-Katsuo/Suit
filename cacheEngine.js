@@ -1,10 +1,15 @@
 const Module = require('module');
 const fs = require('fs');
-const path = require('path');
 
 const originalRequire = Module.prototype.require;
 
-let fileDeps = {};
+let fileDeps = {}, excludedFiles = {};
+
+excludedFiles[__filename] = true;
+
+Object.keys(process.binding('natives')).forEach(name => {
+  excludedFiles[name] = true;
+});
 
 function getStack () {
   let origPrepareStackTrace = Error.prepareStackTrace;
@@ -18,42 +23,35 @@ function getStack () {
   return stack;
 }
 
-function resolveName (filename, type, parent) {
-  if (type === 'require') {
-    if (!Object.keys(process.binding('natives')).includes(filename)) {
-      if (parent) {
-        filename = Module._resolveFilename(filename, parent, false);
-      } else {
-        filename = path.resolve(filename);
-      }
-    }
-  } else {
-    filename = path.resolve(filename);
+function resolveRequireFilename (filename, parent) {
+  if (!Object.keys(process.binding('natives')).includes(filename)) {
+    filename = Module._resolveFilename(filename, parent, false);
   }
 
   return filename;
 }
 
-function depType (name, type, parent) {
-  name = resolveName(name, type, parent);
-  fileDeps[name] = fileDeps[name] || {};
-  fileDeps[name].type = type;
+function depType (filename, type) {
+  if (excludedFiles[filename]) {
+    return;
+  }
+
+  fileDeps[filename] = fileDeps[filename] || {};
+  fileDeps[filename].type = type;
 }
 
-function addDep (src, srcType, filename, filenameType, parent) {
-  src = resolveName(src, srcType, parent);
-  filename = resolveName(filename, filenameType, parent);
+function addDep (src, filename) {
+  if (excludedFiles[filename] || excludedFiles[src]) {
+    return;
+  }
+
   fileDeps[filename] = fileDeps[filename] || {};
   fileDeps[filename].dependants = fileDeps[filename].dependants || {};
   fileDeps[filename].dependants[src] = true;
 }
 
-function invalidateCache (filename, parent) {
+function invalidateCache (filename) {
   if (fileDeps[filename] && fileDeps[filename].cache) {
-    if (fileDeps[filename].type) {
-      filename = resolveName(filename, fileDeps[filename].type, parent);
-    }
-
     if (fileDeps[filename].type === 'require') {
       if (require.cache[filename]) {
         delete require.cache[filename];
@@ -72,8 +70,11 @@ function invalidateCache (filename, parent) {
   }
 }
 
-function setCache (filename, type, cache, parent) {
-  filename = resolveName(filename, type, parent);
+function setCache (filename, cache) {
+  if (excludedFiles[filename]) {
+    return cache;
+  }
+
   fileDeps[filename] = fileDeps[filename] || {};
   fileDeps[filename].cache = cache;
 
@@ -92,16 +93,18 @@ function setCache (filename, type, cache, parent) {
 
 Module.prototype.require = function (...args) {
   let prev = getStack()[0].getFileName();
-  depType(prev, 'require', this);
-  depType(args[0], 'require', this);
-  addDep(prev, 'require', args[0], 'require', this);
+  let current = resolveRequireFilename(args[0], this);
 
-  return setCache(args[0], 'require', originalRequire.apply(this, args));
+  depType(prev, 'require');
+  depType(current, 'require');
+  addDep(prev, current);
+
+  return setCache(current, originalRequire.apply(this, args));
 };
 
 module.exports = {
   fileDeps,
-  resolveName,
+  excludedFiles,
   depType,
   addDep,
   setCache,

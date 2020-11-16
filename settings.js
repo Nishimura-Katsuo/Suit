@@ -10,4 +10,6 @@ module.exports = {
       secure: false,
     },
   },
+  username: 'test',
+  password: 'test',
 };
